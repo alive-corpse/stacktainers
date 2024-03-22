@@ -6,7 +6,7 @@ class ContainerFabric:
     2x1, 2x2, 2x3, 3x3
     """
 
-    def __init__(self, wallwidth=0.8, gap=0.1, freegap=0.2, bevel=1):
+    def __init__(self, wallwidth=0.8, gap=0.08, freegap=0.2, bevel=1):
         self.wallwidth = wallwidth
         self.gap = gap
         self.freegap = freegap
@@ -15,7 +15,7 @@ class ContainerFabric:
         self.expansionheight = self.insertionheight+2 # Expansion Height
         print("Initialisation container fabric\nCommon settings: \n\twall width: %s, bevel: %s\n\tgap (tight fit): %s, freegap (free fit): %s\n\t insertion height: %s, expansion height: %s" % (self.wallwidth, self.bevel, self.gap, self.freegap, self.insertionheight, self.expansionheight))
 
-    def ExportContainer(self, x=42, y=42, z=42, sizetype='ext', layouts=[]):
+    def ExportContainer(self, x=42, y=42, z=42, sizetype='ext', layouts=[], cap=False, label=None):
         g = self.gap
         w = self.wallwidth
         gw = g+w
@@ -24,10 +24,14 @@ class ContainerFabric:
         ih = self.insertionheight
         eh = self.expansionheight
         
+        if label:
+            fname = 'Stacktainer_%s_%sx%sx%s.stl' % (label,x,y,z)
+        else:
+            fname = 'Stacktainer_%sx%sx%s.stl' % (x,y,z)
 
         print("\nCreating new container: %sx%sx%s" % (x,y,z))
         
-        vertices = np.array(
+        ct_vertices = np.array(
             [
                 [gwb,gwb,0], [gwb,y-gwb,0], [x-gwb, y-gwb,0], [x-gwb, gwb,0], # Bottom
                 [gwb,gw,b], [gw, gwb,b], [gw,y-gwb,b], [gwb,y-gw,b], [x-gwb, y-gw,b], [x-gw,y-gwb,b], [x-gw,gwb,b], [x-gwb,gw,b], # Insertion
@@ -36,7 +40,7 @@ class ContainerFabric:
                 [b,0,z], [0,b,z], [0,y-b,z], [b,y,z], [x-b,y,z], [x,y-b,z], [x,b,z], [x-b,0,z] # Wall and top
             ]
         )
-        faces = np.array(
+        ct_faces = np.array(
             [
                 [0,1,2], [0,2,3], # Bottom
                 [5,0,4], [1,0,6], [5,6,0], [6,7,1], [8,2,1], [8,1,7], [9,2,8], [10,3,2], [10,2,9], [11,3,10], [4,0,3], [4,3,11], # Bevel
@@ -48,23 +52,38 @@ class ContainerFabric:
         )
 
 
-        container = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-        for i, f in enumerate(faces):
+        container = mesh.Mesh(np.zeros(ct_faces.shape[0], dtype=mesh.Mesh.dtype))
+        for i, f in enumerate(ct_faces):
             for j in range(3):
-                container.vectors[i][j] = vertices[f[j],:]
+                container.vectors[i][j] = ct_vertices[f[j],:]
 
-        container.save('Stacktainer_%sx%sx%s.stl' % (x,y,z))
+        container.save(fname)
+
+        if cap:
+            print ("\nGenerating cap for %sx%s" % (x,y))
+            self.ExportContainer(x,y,eh+1, cap=False, label='cap')
 
         if layouts:
-            print("Creating subtainers %s" % layouts)
-            newz = z - ih - gw
+            print("\nCreating subtainers %s" % layouts)
+            
             for layout in layouts:
-                xcount, ycount = layout.split('x')
-                xcount = int(xcount); ycount = int(ycount)
+                if label:
+                    newlabel = label + '_'
+                else:
+                    newlabel = ''
+                dim = layout.split('x')
+                xcount = int(dim[0]); ycount = int(dim[1])
                 newx = round((x - w*2 - g*(xcount+1))/xcount,2)
                 newy = round((y - w*2 - g*(ycount+1))/ycount,2)
-                self.ExportContainer(newx,newy,newz)
-
+                if len(dim) > 2:
+                    zcount = int(dim[2])
+                    newlabel += '%sx%sx%s' % (dim[0], dim[1], dim[2])
+                else:
+                    zcount = 1
+                    newlabel += '%sx%s' % (dim[0], dim[1])
+                newz = round((z-eh-ih)/zcount + ih, 2)
+                self.ExportContainer(newx,newy,newz,label=newlabel,cap=cap)
 
 cf = ContainerFabric()
-cf.ExportContainer(84,84,46, layouts=["2x1", "2x2", "3x1", "3x2", "4x1"])
+#cf.ExportContainer(86,86,47, layouts=["1x1", "1x1x2", "1x1x3"])
+cf.ExportContainer(86,86,47, layouts=["1x1x3", "2x1", "2x1x2", "2x2", "2x2x2", "3x1", "3x2", "3x2x2", "4x1", "4x2", "4x2x2", "4x3", "4x4"], cap=True)
